@@ -1,9 +1,12 @@
-# Load required libraries
+# Complete library list for rsconnect deployment
 library(shiny)
 library(shinydashboard)
 library(DT)
 library(plotly)
 library(SingleCellExperiment)
+library(SummarizedExperiment)
+library(BiocGenerics)
+library(S4Vectors)
 library(ggplot2)
 library(GGally)
 library(dplyr)
@@ -13,13 +16,23 @@ library(MASS)
 library(rlang)
 library(igraph)
 library(FNN)
+library(isotree)
+library(scales)
+library(methods)
+library(stats)
+library(utils)
+library(grDevices)
+library(graphics)
 
 # Source support functions
+source("support/argumentCheck.R")
 source("support/projectPCA.R")
 source("support/generateColors.R")
 source("support/plotCellTypePCA_app.R")
 source("support/calculateGraphIntegration_app.R")
 source("support/plotGraphIntegration_app.R")
+source("support/detectAnomaly_app.R")
+source("support/plotAnomaly_app.R")
 
 # Load the datasets
 query_cells <- readRDS("data/query_marrow_myeloid.rds")
@@ -35,6 +48,7 @@ ui <- dashboardPage(
             menuItem("Data Overview", tabName = "overview", icon = icon("table")),
             menuItem("PCA Projection", tabName = "pca", icon = icon("project-diagram")),
             menuItem("Graph Integration", tabName = "graph", icon = icon("network-wired")),
+            menuItem("Anomaly Detection", tabName = "anomaly", icon = icon("exclamation-triangle")),
             menuItem("Cell Type Distribution", tabName = "distribution", icon = icon("chart-pie")),
             menuItem("Marker Gene Analysis", tabName = "markers", icon = icon("dna")),
             menuItem("Quality Metrics", tabName = "quality", icon = icon("chart-line"))
@@ -52,13 +66,13 @@ ui <- dashboardPage(
                         fluidRow(
                             column(6,
                                    selectInput("reference_dataset", "Reference Dataset:",
-                                               choices = list("Reference Cells" = "reference_cells",
-                                                              "Reference Cells Subset" = "reference_cells_subset"),
+                                               choices = list("Reference Marrow Myeloid Cells" = "reference_cells",
+                                                              "Reference Marrow Myeloid Cells (Promonocytes Removed)" = "reference_cells_subset"),
                                                selected = "reference_cells")
                             ),
                             column(6,
                                    selectInput("query_dataset", "Query Dataset:",
-                                               choices = list("Query Cells" = "query_cells"),
+                                               choices = list("Query Marrow Myeloid Cells" = "query_cells"),
                                                selected = "query_cells")
                             )
                         )
@@ -232,6 +246,82 @@ ui <- dashboardPage(
                 )
             ),
             
+            # Anomaly Detection Tab
+            tabItem(
+                tabName = "anomaly",
+                fluidRow(
+                    box(
+                        title = "Anomaly Detection Parameters", status = "primary", solidHeader = TRUE, width = 4,
+                        selectInput("anomaly_ref_cell_type_col", "Reference Cell Type Column:",
+                                    choices = NULL),
+                        selectInput("anomaly_query_cell_type_col", "Query Cell Type Column:",
+                                    choices = NULL),
+                        selectInput("anomaly_assay_name", "Assay:",
+                                    choices = c("logcounts", "counts"),
+                                    selected = "logcounts"),
+                        checkboxGroupInput("anomaly_pc_subset", "Principal Components:",
+                                           choices = setNames(1:10, paste0("PC", 1:10)),
+                                           selected = 1:5),
+                        selectInput("anomaly_cell_types", "Cell Types (leave empty for all):",
+                                    choices = NULL,
+                                    multiple = TRUE),
+                        br(),
+                        h4("Isolation Forest Parameters:"),
+                        numericInput("n_tree", "Number of Trees:", value = 500, min = 100, max = 2000, step = 100),
+                        numericInput("anomaly_threshold", "Anomaly Threshold:", value = 0.6, min = 0.1, max = 0.9, step = 0.05),
+                        br(),
+                        h4("Visualization Options:"),
+                        selectInput("anomaly_cell_type_plot", "Cell Type to Plot:",
+                                    choices = NULL),
+                        selectInput("anomaly_data_type", "Data Type:",
+                                    choices = c("Query" = "query", "Reference" = "reference"),
+                                    selected = "query"),
+                        selectInput("anomaly_upper_facet", "Upper Panels:",
+                                    choices = c("blank", "contour", "ellipse"),
+                                    selected = "blank"),
+                        selectInput("anomaly_diagonal_facet", "Diagonal Panels:",
+                                    choices = c("density", "ridge", "boxplot", "blank"),
+                                    selected = "density"),
+                        br(),
+                        actionButton("generate_anomaly", "Generate Anomaly Analysis", 
+                                     class = "btn-primary", width = "100%"),
+                        br(), br(),
+                        downloadButton("download_anomaly_plot", "Download Plot", 
+                                       class = "btn-success", width = "100%")
+                    ),
+                    box(
+                        title = "Interactive Anomaly Detection Analysis", status = "success", solidHeader = TRUE, width = 8,
+                        conditionalPanel(
+                            condition = "input.generate_anomaly == 0",
+                            div(style = "text-align: center; padding: 50px;",
+                                h3("Configure parameters and click 'Generate Anomaly Analysis' to start", 
+                                   style = "color: #999;"))
+                        ),
+                        conditionalPanel(
+                            condition = "input.generate_anomaly > 0",
+                            withSpinner(plotOutput("anomaly_plot", height = "700px"), color = "#0dc5c1")
+                        )
+                    )
+                ),
+                fluidRow(
+                    box(
+                        title = "Anomaly Statistics", status = "info", solidHeader = TRUE, width = 6,
+                        conditionalPanel(
+                            condition = "input.generate_anomaly > 0",
+                            h4("Anomaly Detection Results"),
+                            verbatimTextOutput("anomaly_stats")
+                        )
+                    ),
+                    box(
+                        title = "Analysis Summary", status = "info", solidHeader = TRUE, width = 6,
+                        conditionalPanel(
+                            condition = "input.generate_anomaly > 0",
+                            verbatimTextOutput("anomaly_analysis_summary")
+                        )
+                    )
+                )
+            ),
+            
             # Placeholder tabs for future diagnostics
             tabItem(
                 tabName = "distribution", 
@@ -293,8 +383,8 @@ server <- function(input, output, session) {
         query_cols <- colnames(colData(query_data()))
         
         # Filter for likely cell type columns
-        ref_cell_type_cols <- ref_cols[grepl("cell|type|label|cluster", ref_cols, ignore.case = TRUE)]
-        query_cell_type_cols <- query_cols[grepl("cell|type|label|cluster", query_cols, ignore.case = TRUE)]
+        ref_cell_type_cols <- ref_cols
+        query_cell_type_cols <- query_cols
         
         updateSelectInput(session, "ref_cell_type_col",
                           choices = ref_cell_type_cols,
@@ -310,14 +400,31 @@ server <- function(input, output, session) {
         ref_cols <- colnames(colData(ref_data()))
         query_cols <- colnames(colData(query_data()))
         
-        ref_cell_type_cols <- ref_cols[grepl("cell|type|label|cluster", ref_cols, ignore.case = TRUE)]
-        query_cell_type_cols <- query_cols[grepl("cell|type|label|cluster", query_cols, ignore.case = TRUE)]
+        ref_cell_type_cols <- ref_cols
+        query_cell_type_cols <- query_cols
         
         updateSelectInput(session, "graph_ref_cell_type_col",
                           choices = ref_cell_type_cols,
                           selected = if(length(ref_cell_type_cols) > 0) ref_cell_type_cols[1] else NULL)
         
         updateSelectInput(session, "graph_query_cell_type_col", 
+                          choices = query_cell_type_cols,
+                          selected = if(length(query_cell_type_cols) > 0) query_cell_type_cols[1] else NULL)
+    })
+    
+    # Update cell type column choices for anomaly detection
+    observe({
+        ref_cols <- colnames(colData(ref_data()))
+        query_cols <- colnames(colData(query_data()))
+        
+        ref_cell_type_cols <- ref_cols
+        query_cell_type_cols <- query_cols
+        
+        updateSelectInput(session, "anomaly_ref_cell_type_col",
+                          choices = ref_cell_type_cols,
+                          selected = if(length(ref_cell_type_cols) > 0) ref_cell_type_cols[1] else NULL)
+        
+        updateSelectInput(session, "anomaly_query_cell_type_col", 
                           choices = query_cell_type_cols,
                           selected = if(length(query_cell_type_cols) > 0) query_cell_type_cols[1] else NULL)
     })
@@ -346,10 +453,27 @@ server <- function(input, output, session) {
         updateSelectInput(session, "graph_cell_types", choices = all_types)
     })
     
-    # Dataset summaries
+    # Update available cell types for anomaly detection
+    observe({
+        req(input$anomaly_ref_cell_type_col, input$anomaly_query_cell_type_col)
+        
+        ref_types <- unique(colData(ref_data())[[input$anomaly_ref_cell_type_col]])
+        query_types <- unique(colData(query_data())[[input$anomaly_query_cell_type_col]])
+        all_types <- sort(unique(c(ref_types, query_types)))
+        all_types <- all_types[!is.na(all_types)]
+        
+        updateSelectInput(session, "anomaly_cell_types", choices = all_types)
+        updateSelectInput(session, "anomaly_cell_type_plot", choices = c("Combined", all_types), selected = "Combined")
+    })
+    
+    # Dataset summaries with updated names
     output$ref_summary <- renderText({
         data <- ref_data()
+        dataset_name <- switch(input$reference_dataset,
+                               "reference_cells" = "Reference Marrow Myeloid Cells",
+                               "reference_cells_subset" = "Reference Marrow Myeloid Cells (Promonocytes Removed)")
         paste(
+            paste("Dataset:", dataset_name),
             paste("Dimensions:", paste(dim(data), collapse = " x ")),
             paste("Assays:", paste(assayNames(data), collapse = ", ")),
             paste("Reduced Dims:", paste(reducedDimNames(data), collapse = ", ")),
@@ -362,6 +486,7 @@ server <- function(input, output, session) {
     output$query_summary <- renderText({
         data <- query_data()
         paste(
+            paste("Dataset: Query Marrow Myeloid Cells"),
             paste("Dimensions:", paste(dim(data), collapse = " x ")),
             paste("Assays:", paste(assayNames(data), collapse = ", ")),
             paste("Reduced Dims:", paste(reducedDimNames(data), collapse = ", ")),
@@ -443,9 +568,13 @@ server <- function(input, output, session) {
                 selected_cell_types <- selected_cell_types[!is.na(selected_cell_types)]
             }
             
+            dataset_name <- switch(input$reference_dataset,
+                                   "reference_cells" = "Reference Marrow Myeloid Cells",
+                                   "reference_cells_subset" = "Reference Marrow Myeloid Cells (Promonocytes Removed)")
+            
             paste(
-                paste("Reference Dataset:", input$reference_dataset),
-                paste("Query Dataset:", input$query_dataset),
+                paste("Reference Dataset:", dataset_name),
+                paste("Query Dataset: Query Marrow Myeloid Cells"),
                 paste("Selected PCs:", paste(pc_nums, collapse = ", ")),
                 paste("Cell Types:", paste(selected_cell_types, collapse = ", ")),
                 paste("Reference Column:", input$ref_cell_type_col),
@@ -565,11 +694,14 @@ server <- function(input, output, session) {
         req(graph_result_reactive())
         
         result <- graph_result_reactive()
+        dataset_name <- switch(input$reference_dataset,
+                               "reference_cells" = "Reference Marrow Myeloid Cells",
+                               "reference_cells_subset" = "Reference Marrow Myeloid Cells (Promonocytes Removed)")
         
         paste(
             "=== ANALYSIS PARAMETERS ===",
-            paste("Reference Dataset:", input$reference_dataset),
-            paste("Query Dataset:", input$query_dataset),
+            paste("Reference Dataset:", dataset_name),
+            paste("Query Dataset: Query Marrow Myeloid Cells"),
             paste("Reference Cell Type Column:", input$graph_ref_cell_type_col),
             paste("Query Cell Type Column:", input$graph_query_cell_type_col),
             paste("Assay Used:", input$graph_assay_name),
@@ -605,6 +737,194 @@ server <- function(input, output, session) {
                     plot_type = input$graph_plot_type,
                     color_by = input$graph_color_by,
                     exclude_reference_only = input$exclude_reference_only
+                )
+                if(!is.null(plot_obj)) {
+                    ggsave(file, plot_obj, width = 12, height = 10, dpi = 300)
+                }
+            }
+        }
+    )
+    
+    # ============ ANOMALY DETECTION SECTION ============
+    
+    # Reactive for Anomaly Detection analysis
+    anomaly_result_reactive <- eventReactive(input$generate_anomaly, {
+        req(input$anomaly_ref_cell_type_col, input$anomaly_query_cell_type_col, input$anomaly_pc_subset)
+        
+        # Convert PC subset to numeric
+        pc_nums <- as.numeric(input$anomaly_pc_subset)
+        
+        # Get selected cell types
+        selected_cell_types <- input$anomaly_cell_types
+        if(is.null(selected_cell_types) || length(selected_cell_types) == 0) {
+            selected_cell_types <- NULL
+        }
+        
+        # Call the anomaly detection function
+        tryCatch({
+            detectAnomaly_app(
+                reference_data = ref_data(),
+                query_data = query_data(),
+                ref_cell_type_col = input$anomaly_ref_cell_type_col,
+                query_cell_type_col = input$anomaly_query_cell_type_col,
+                cell_types = selected_cell_types,
+                pc_subset = pc_nums,
+                n_tree = input$n_tree,
+                anomaly_threshold = input$anomaly_threshold,
+                assay_name = input$anomaly_assay_name
+            )
+        }, error = function(e) {
+            showNotification(paste("Error in anomaly detection:", e$message), type = "error")
+            NULL
+        })
+    })
+    
+    # Render Anomaly Detection plot
+    output$anomaly_plot <- renderPlot({
+        req(anomaly_result_reactive())
+        
+        result <- anomaly_result_reactive()
+        
+        tryCatch({
+            plotAnomaly_app(
+                x = result,
+                cell_type = input$anomaly_cell_type_plot,
+                pc_subset = as.numeric(input$anomaly_pc_subset),
+                data_type = input$anomaly_data_type,
+                n_tree = input$n_tree,
+                upper_facet = input$anomaly_upper_facet,
+                diagonal_facet = input$anomaly_diagonal_facet
+            )
+        }, error = function(e) {
+            showNotification(paste("Error generating anomaly plot:", e$message), type = "error")
+            NULL
+        })
+    })
+    
+    # Anomaly statistics output
+    output$anomaly_stats <- renderText({
+        req(anomaly_result_reactive())
+        
+        result <- anomaly_result_reactive()
+        cell_type <- input$anomaly_cell_type_plot
+        data_type <- input$anomaly_data_type
+        
+        if(cell_type %in% names(result)) {
+            cell_result <- result[[cell_type]]
+            
+            if(data_type == "query" && !is.null(cell_result[["query_anomaly_scores"]])) {
+                anomaly_scores <- cell_result[["query_anomaly_scores"]]
+                anomaly_flags <- cell_result[["query_anomaly"]]
+                data_name <- "Query"
+            } else if(data_type == "reference") {
+                anomaly_scores <- cell_result[["reference_anomaly_scores"]]
+                anomaly_flags <- cell_result[["reference_anomaly"]]
+                data_name <- "Reference"
+            } else {
+                return("No data available for selected combination")
+            }
+            
+            n_total <- length(anomaly_scores)
+            n_anomalies <- sum(anomaly_flags)
+            anomaly_rate <- n_anomalies / n_total
+            mean_score <- mean(anomaly_scores, na.rm = TRUE)
+            median_score <- median(anomaly_scores, na.rm = TRUE)
+            
+            paste(
+                paste("=== ANOMALY STATISTICS ==="),
+                paste("Cell Type:", cell_type),
+                paste("Data Type:", data_name),
+                paste("Anomaly Threshold:", input$anomaly_threshold),
+                "",
+                paste("=== RESULTS ==="),
+                paste("Total Cells:", n_total),
+                paste("Anomalous Cells:", n_anomalies),
+                paste("Anomaly Rate:", sprintf("%.2f%%", anomaly_rate * 100)),
+                "",
+                paste("=== ANOMALY SCORES ==="),
+                paste("Mean Score:", round(mean_score, 3)),
+                paste("Median Score:", round(median_score, 3)),
+                paste("Min Score:", round(min(anomaly_scores, na.rm = TRUE), 3)),
+                paste("Max Score:", round(max(anomaly_scores, na.rm = TRUE), 3)),
+                sep = "\n"
+            )
+        } else {
+            "No results available for selected cell type"
+        }
+    })
+    
+    # Anomaly analysis summary
+    output$anomaly_analysis_summary <- renderText({
+        req(anomaly_result_reactive())
+        
+        result <- anomaly_result_reactive()
+        dataset_name <- switch(input$reference_dataset,
+                               "reference_cells" = "Reference Marrow Myeloid Cells",
+                               "reference_cells_subset" = "Reference Marrow Myeloid Cells (Promonocytes Removed)")
+        
+        # Calculate overall statistics
+        all_cell_types <- names(result)
+        total_query_cells <- 0
+        total_anomalous_query <- 0
+        total_ref_cells <- 0
+        total_anomalous_ref <- 0
+        
+        for(ct in all_cell_types) {
+            if(!is.null(result[[ct]][["query_anomaly"]])) {
+                total_query_cells <- total_query_cells + length(result[[ct]][["query_anomaly"]])
+                total_anomalous_query <- total_anomalous_query + sum(result[[ct]][["query_anomaly"]])
+            }
+            if(!is.null(result[[ct]][["reference_anomaly"]])) {
+                total_ref_cells <- total_ref_cells + length(result[[ct]][["reference_anomaly"]])
+                total_anomalous_ref <- total_anomalous_ref + sum(result[[ct]][["reference_anomaly"]])
+            }
+        }
+        
+        paste(
+            "=== ANALYSIS PARAMETERS ===",
+            paste("Reference Dataset:", dataset_name),
+            paste("Query Dataset: Query Marrow Myeloid Cells"),
+            paste("Reference Cell Type Column:", input$anomaly_ref_cell_type_col),
+            paste("Query Cell Type Column:", input$anomaly_query_cell_type_col),
+            paste("Assay Used:", input$anomaly_assay_name),
+            paste("Principal Components:", paste(input$anomaly_pc_subset, collapse = ", ")),
+            "",
+            "=== ISOLATION FOREST PARAMETERS ===",
+            paste("Number of Trees:", input$n_tree),
+            paste("Anomaly Threshold:", input$anomaly_threshold),
+            "",
+            "=== OVERALL RESULTS ===",
+            paste("Cell Types Analyzed:", length(all_cell_types)),
+            if(total_query_cells > 0) paste("Query Anomaly Rate:", sprintf("%.2f%%", (total_anomalous_query/total_query_cells) * 100)) else "",
+            if(total_ref_cells > 0) paste("Reference Anomaly Rate:", sprintf("%.2f%%", (total_anomalous_ref/total_ref_cells) * 100)) else "",
+            paste("Total Query Cells:", total_query_cells),
+            paste("Total Anomalous Query Cells:", total_anomalous_query),
+            "",
+            "=== VISUALIZATION SETTINGS ===",
+            paste("Plot Cell Type:", input$anomaly_cell_type_plot),
+            paste("Plot Data Type:", input$anomaly_data_type),
+            paste("Upper Facet:", input$anomaly_upper_facet),
+            paste("Diagonal Facet:", input$anomaly_diagonal_facet),
+            sep = "\n"
+        )
+    })
+    
+    # Download handler for anomaly plot
+    output$download_anomaly_plot <- downloadHandler(
+        filename = function() {
+            paste0("Anomaly_detection_", input$anomaly_cell_type_plot, "_", input$anomaly_data_type, "_", Sys.Date(), ".png")
+        },
+        content = function(file) {
+            result <- anomaly_result_reactive()
+            if(!is.null(result)) {
+                plot_obj <- plotAnomaly_app(
+                    x = result,
+                    cell_type = input$anomaly_cell_type_plot,
+                    pc_subset = as.numeric(input$anomaly_pc_subset),
+                    data_type = input$anomaly_data_type,
+                    n_tree = input$n_tree,
+                    upper_facet = input$anomaly_upper_facet,
+                    diagonal_facet = input$anomaly_diagonal_facet
                 )
                 if(!is.null(plot_obj)) {
                     ggsave(file, plot_obj, width = 12, height = 10, dpi = 300)
