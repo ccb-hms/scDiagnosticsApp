@@ -1,12 +1,21 @@
-# BioPlex PTM Enrichment Analysis Shiny App
+# scDiagnostics Interactive App
 
-## Overview
+A Shiny web application for single-cell RNA sequencing annotation diagnostics.
 
-The **BioPlex PTM Enrichment Analysis Shiny App** is designed to evaluate post-translational modifications (PTMs) like acetylation and phosphorylation across various cell lines using CORUM, KEGG and GO gene sets. The apps allows users to explore enrichment and depletion analysis through interactive tables, network plots, and more.
+## What is this?
 
-## Features of PTM Enrichment App
+This app provides an interactive interface for the `scDiagnostics` R package, allowing users to assess the quality of single-cell annotation through a web browser.
 
--   Selection of cell lines and PTM types.
--   Choice of gene set collections from CORUM, KEGG and GO.
--   Displays enrichment or depletion for selected parameters.
--   Interactive data tables and dynamically generated network plots.
+## Features
+
+- **PCA Projection**: Visualize cell type distributions in principal component space
+- **Graph Integration**: Detect annotation inconsistencies using graph analysis
+- **Anomaly Detection**: Detect annotation inconsistencies using isolation forests
+- **Interactive Plots**: Real-time parameter adjustment and visualization
+- **Download Results**: Save high-resolution plots
+
+## Usage
+
+1. Select your datasets in the Data Overview tab
+2. Configure parameters and diagnostic plots and statistical measures
+3. Download results as needed
