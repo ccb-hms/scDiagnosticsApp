@@ -19,8 +19,8 @@ ui <- dashboardPage(
             menuItem("Upload Data", tabName = "upload", icon = icon("upload")),
             menuItem("PCA Projection", tabName = "pca", icon = icon("chart-line")),
             menuItem("Discriminant Space", tabName = "discriminant", icon = icon("search-plus")),
-            menuItem("Graph Integration", tabName = "graph", icon = icon("project-diagram")),
             menuItem("Anomaly Detection", tabName = "anomaly", icon = icon("exclamation-triangle")),
+            menuItem("Graph Integration", tabName = "graph", icon = icon("project-diagram")),
             menuItem("Wasserstein Distance", tabName = "wasserstein", icon = icon("wave-square")),
             menuItem("Marker Expression", tabName = "marker", icon = icon("dna")),
             menuItem("Gene Expression DimRed", tabName = "dimred", icon = icon("project-diagram"))
@@ -49,8 +49,8 @@ ui <- dashboardPage(
             upload_tab,
             pca_tab,
             discriminant_tab,
-            graph_tab,
             anomaly_tab,
+            graph_tab,
             wasserstein_tab,
             marker_tab,
             dimred_tab
