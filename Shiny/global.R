@@ -1,28 +1,3 @@
-# Load required libraries
-library(shiny)
-library(shinydashboard)
-library(DT)
-library(plotly)
-library(ggplot2)
-library(SingleCellExperiment)
-library(SummarizedExperiment)
-library(scater)
-library(scran)
-library(igraph)
-library(cluster)
-library(GGally)
-library(ggridges)
-library(gridExtra)
-library(RColorBrewer)
-library(viridis)
-library(shinycssloaders)
-library(randomForest)
-library(corpcor)
-library(isotree)
-library(transport)
-library(Matrix)
-library(methods)
-
 # Set maximum file upload size to 100MB
 options(shiny.maxRequestSize = 100*1024^2)
 

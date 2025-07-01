@@ -17,7 +17,7 @@ setup_upload_outputs <- function(input, output, session, uploaded_data) {
             
             # Validate it's a SingleCellExperiment
             if (!is(ref_data, "SingleCellExperiment")) {
-                showNotification("Uploaded file is not a SingleCellExperiment object", type = "error")
+                showNotification("Uploaded file is not a SingleCellExperiment object", type = "error", duration = 5)
                 return()
             }
             
@@ -33,10 +33,10 @@ setup_upload_outputs <- function(input, output, session, uploaded_data) {
             ref_cols <- colnames(colData(ref_data))
             updateSelectInput(session, "uploaded_ref_cell_type_col", choices = ref_cols)
             
-            showNotification(paste("Reference dataset", dataset_name, "uploaded successfully!"), type = "success")
+            showNotification(paste("Reference dataset", dataset_name, "uploaded successfully!"), type = "message", duration = 5)
             
         }, error = function(e) {
-            showNotification(paste("Error loading reference file:", e$message), type = "error")
+            showNotification(paste("Error loading reference file:", e$message), type = "error", duration = 10)
             values$reference_uploaded <- FALSE
         })
     })
@@ -51,7 +51,7 @@ setup_upload_outputs <- function(input, output, session, uploaded_data) {
             
             # Validate it's a SingleCellExperiment
             if (!is(query_data, "SingleCellExperiment")) {
-                showNotification("Uploaded file is not a SingleCellExperiment object", type = "error")
+                showNotification("Uploaded file is not a SingleCellExperiment object", type = "error", duration = 5)
                 return()
             }
             
@@ -67,10 +67,10 @@ setup_upload_outputs <- function(input, output, session, uploaded_data) {
             query_cols <- colnames(colData(query_data))
             updateSelectInput(session, "uploaded_query_cell_type_col", choices = query_cols)
             
-            showNotification(paste("Query dataset", dataset_name, "uploaded successfully!"), type = "success")
+            showNotification(paste("Query dataset", dataset_name, "uploaded successfully!"), type = "message", duration = 5)
             
         }, error = function(e) {
-            showNotification(paste("Error loading query file:", e$message), type = "error")
+            showNotification(paste("Error loading query file:", e$message), type = "error", duration = 10)
             values$query_uploaded <- FALSE
         })
     })
