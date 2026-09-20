@@ -54,6 +54,17 @@ ui <- dashboardPage(
             wasserstein_tab,
             marker_tab,
             dimred_tab
+        ),
+
+        # Citation footer
+        tags$footer(
+            style = "margin-top: 20px; padding: 10px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #d2d6de;",
+            HTML(paste0(
+                "If you use this app in published research, please cite: Christidis A, Ghazi A, Chawla S, ",
+                "Turaga N, Gentleman R, Geistlinger L (2026). scDiagnostics: systematic assessment of cell type ",
+                "annotation in single-cell transcriptomics data. <em>Briefings in Bioinformatics</em>, 27(5), bbag496. ",
+                "doi: <a href='https://doi.org/10.1093/bib/bbag496' target='_blank'>10.1093/bib/bbag496</a>."
+            ))
         )
     )
 )

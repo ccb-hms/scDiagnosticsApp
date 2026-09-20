@@ -1,0 +1,56 @@
+# ------------------------------------------------
+# CITATION.cff file created with {cffr} R package
+# See also: https://docs.ropensci.org/cffr/
+# ------------------------------------------------
+
+cff-version: 1.2.0
+message: 'To cite the scDiagnostics app in publications use:'
+type: software
+title: 'scDiagnosticsApp: interactive Shiny application for scDiagnostics'
+abstract: A Shiny web application providing an interactive interface to the scDiagnostics
+  R/Bioconductor package, allowing users to assess the quality of single-cell annotation
+  through a web browser.
+authors:
+- family-names: Christidis
+  given-names: Anthony
+  email: anthony-alexander_christidis@hms.harvard.edu
+  orcid: https://orcid.org/0000-0002-4565-6279
+- family-names: Ghazi
+  given-names: Andrew
+- family-names: Chawla
+  given-names: Smriti
+- family-names: Geistlinger
+  given-names: Ludwig
+- family-names: Gentleman
+  given-names: Robert
+preferred-citation:
+  type: article
+  title: 'scDiagnostics: systematic assessment of cell type annotation in single-cell
+    transcriptomics data'
+  authors:
+  - family-names: Christidis
+    given-names: Anthony
+    email: anthony-alexander_christidis@hms.harvard.edu
+    orcid: https://orcid.org/0000-0002-4565-6279
+  - family-names: Ghazi
+    given-names: Andrew
+  - family-names: Chawla
+    given-names: Smriti
+  - family-names: Turaga
+    given-names: Nitesh
+  - family-names: Gentleman
+    given-names: Robert
+  - family-names: Geistlinger
+    given-names: Ludwig
+  journal: Briefings in Bioinformatics
+  year: '2026'
+  volume: '27'
+  issue: '5'
+  doi: 10.1093/bib/bbag496
+repository-code: https://github.com/ccb-hms/scDiagnosticsApp
+url: https://ccb.connect.hms.harvard.edu/scDiagnosticsApp/
+contact:
+- family-names: Christidis
+  given-names: Anthony
+  email: anthony-alexander_christidis@hms.harvard.edu
+  orcid: https://orcid.org/0000-0002-4565-6279
