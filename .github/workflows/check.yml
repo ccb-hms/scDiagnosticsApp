@@ -24,13 +24,18 @@ jobs:
       - name: Cache R packages
         uses: actions/cache@v4
         with:
-          path: /usr/local/lib/R/host-site-library
+          # Where the container actually installs packages; host-site-library
+          # only exists when the image is run with a mounted volume.
+          path: /usr/local/lib/R/site-library
           key: ${{ runner.os }}-bioc-devel-${{ hashFiles('app/manifest.json') }}
           restore-keys: ${{ runner.os }}-bioc-devel-
 
       - name: Install dependencies
         run: |
           options(repos = BiocManager::repositories(), Ncpus = 2)
+          # BiocManager delegates GitHub installs to remotes, which the
+          # Bioconductor image does not ship.
+          if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes")
           BiocManager::install("ccb-hms/scDiagnostics", ask = FALSE, update = FALSE)
           pkgs <- c("shiny", "bslib", "bsicons", "DT", "cachem", "digest",
                     "future", "promises", "ggplot2", "GGally", "ggridges",
@@ -93,7 +98,10 @@ jobs:
       - name: Regenerate and compare
         run: |
           options(repos = BiocManager::repositories())
-          if (!requireNamespace("rsconnect", quietly = TRUE)) install.packages("rsconnect")
+          # remotes is what BiocManager uses to install from GitHub.
+          deps <- c("rsconnect", "remotes")
+          missing <- deps[!vapply(deps, requireNamespace, logical(1), quietly = TRUE)]
+          if (length(missing)) install.packages(missing)
           BiocManager::install("ccb-hms/scDiagnostics", ask = FALSE, update = FALSE)
           before <- if (file.exists("app/manifest.json")) readLines("app/manifest.json") else character()
           options(renv.config.snapshot.validate = FALSE)
