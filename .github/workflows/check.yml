@@ -1,0 +1,107 @@
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container:
+      # Bioconductor devel: the app needs scDiagnostics >= 1.7.5, which is
+      # newer than the current Bioconductor release.
+      image: bioconductor/bioconductor_docker:devel
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache R packages
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/lib/R/host-site-library
+          key: ${{ runner.os }}-bioc-devel-${{ hashFiles('app/manifest.json') }}
+          restore-keys: ${{ runner.os }}-bioc-devel-
+
+      - name: Install dependencies
+        run: |
+          options(repos = BiocManager::repositories(), Ncpus = 2)
+          BiocManager::install("ccb-hms/scDiagnostics", ask = FALSE, update = FALSE)
+          pkgs <- c("shiny", "bslib", "bsicons", "DT", "cachem", "digest",
+                    "future", "promises", "ggplot2", "GGally", "ggridges",
+                    "scran", "scater", "ComplexHeatmap", "zellkonverter",
+                    "shinytest2", "lintr")
+          missing <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly = TRUE)]
+          if (length(missing)) BiocManager::install(missing, ask = FALSE, update = FALSE)
+        shell: Rscript {0}
+
+      - name: Check the installed package version
+        working-directory: app
+        run: |
+          for (f in list.files("R", pattern = "[.]R$", full.names = TRUE)) source(f)
+          msg <- check_package_version()
+          if (!is.null(msg)) stop(msg)
+          cat("scDiagnostics", as.character(packageVersion("scDiagnostics")), "\n")
+        shell: Rscript {0}
+
+      - name: Lint
+        working-directory: app
+        run: |
+          # Configuration lives in app/.lintr.
+          lints <- lintr::lint_dir("R")
+          print(lints)
+          if (length(lints)) quit(status = 1)
+        shell: Rscript {0}
+
+      # Everything except the browser suite, which needs Chrome.
+      - name: Test
+        working-directory: app
+        run: Rscript tests/run-all.R boot test-modules test-async test-registry test-plots
+
+      - name: Install Chrome
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Test the app end to end
+        working-directory: app
+        env:
+          NOT_CRAN: "true"
+        run: Rscript tests/test-app.R
+
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output
+          path: |
+            app/tests/_snaps
+            app/shots_tmp
+          if-no-files-found: ignore
+
+  manifest:
+    # The manifest must reflect the code, or a deploy installs the wrong
+    # dependency set. Regenerating it and diffing catches a stale commit.
+    runs-on: ubuntu-latest
+    container:
+      image: bioconductor/bioconductor_docker:devel
+    steps:
+      - uses: actions/checkout@v4
+      - name: Regenerate and compare
+        run: |
+          options(repos = BiocManager::repositories())
+          if (!requireNamespace("rsconnect", quietly = TRUE)) install.packages("rsconnect")
+          BiocManager::install("ccb-hms/scDiagnostics", ask = FALSE, update = FALSE)
+          before <- if (file.exists("app/manifest.json")) readLines("app/manifest.json") else character()
+          options(renv.config.snapshot.validate = FALSE)
+          rsconnect::writeManifest(appDir = "app", appPrimaryDoc = "app.R")
+          after <- readLines("app/manifest.json")
+          if (!identical(before, after)) {
+            cat("manifest.json is out of date; regenerate and commit it.\n")
+            quit(status = 1)
+          }
+          cat("manifest.json is current.\n")
+        shell: Rscript {0}
