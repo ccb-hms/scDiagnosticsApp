@@ -1,0 +1,18 @@
+linters: linters_with_defaults(
+    line_length_linter = line_length_linter(120L),
+    # The codebase follows the scDiagnostics package's style: four-space
+    # indents, continuation lines aligned to the opening parenthesis, and
+    # `x <- if (cond) { ... } else value` where the else branch is one
+    # expression. lintr's indentation and brace models do not express that,
+    # so these two would report formatting the project has chosen on purpose.
+    indentation_linter = NULL,
+    brace_linter = NULL,
+    # Shiny input ids and package function names are camelCase and dotted.
+    object_name_linter = NULL,
+    object_length_linter = NULL,
+    # Files in R/ are sourced into one environment and call across each
+    # other, which this linter cannot see.
+    object_usage_linter = NULL
+  )
+exclusions: list("tests", "data-raw", "deploy.R")
+encoding: "UTF-8"
