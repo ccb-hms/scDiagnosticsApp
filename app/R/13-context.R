@@ -116,9 +116,12 @@ context_caption <- function(ctx) {
 #' the user sees a report card before anything runs rather than a stack trace
 #' afterwards.
 inspect_upload <- function(sce, other = NULL, role = "reference") {
-    checks <- list()
+    # Held in an environment so add() names where it writes instead of
+    # reaching back up the scope chain with `<<-`.
+    acc <- new.env(parent = emptyenv())
+    acc$checks <- list()
     add <- function(status, label, detail) {
-        checks[[length(checks) + 1]] <<- list(status = status, label = label, detail = detail)
+        acc$checks[[length(acc$checks) + 1]] <- list(status = status, label = label, detail = detail)
     }
 
     if (!methods::is(sce, "SingleCellExperiment")) {
@@ -126,7 +129,7 @@ inspect_upload <- function(sce, other = NULL, role = "reference") {
             sprintf(paste("This is a %s. The app needs a SingleCellExperiment",
                           "(a SpatialExperiment also works, since it extends one)."),
                     paste(class(sce), collapse = "/")))
-        return(checks)
+        return(acc$checks)
     }
     add("ok", "Object type",
         sprintf("%s, %s genes × %s cells",
@@ -188,7 +191,7 @@ inspect_upload <- function(sce, other = NULL, role = "reference") {
         }
     }
 
-    checks
+    acc$checks
 }
 
 upload_blocked <- function(checks) {

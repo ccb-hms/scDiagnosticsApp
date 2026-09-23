@@ -71,7 +71,17 @@ single_type_prelude <- function(ctx, args, param_values, ref_var, query_var) {
 
 REGISTRY <- list()
 
-add_entry <- function(e) REGISTRY[[e$id]] <<- e
+# This file is sourced into one environment and fills REGISTRY as it goes.
+# add_entry() names that environment, rather than letting `<<-` search for
+# REGISTRY up the scope chain from wherever it happens to be called.
+registry_env <- environment()
+
+add_entry <- function(e) {
+    entries <- get("REGISTRY", envir = registry_env)
+    entries[[e$id]] <- e
+    assign("REGISTRY", entries, envir = registry_env)
+    invisible(e)
+}
 
 # ===========================================================================
 # Visualization
