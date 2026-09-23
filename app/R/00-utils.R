@@ -4,9 +4,12 @@
 #
 # The app calls the package directly and shows its results as the package's
 # own, so running against a version whose behaviour differs would quietly
-# misattribute results. 1.7.6 is the first version carrying the fix for
-# detectAnomaly() on a reference cell type absent from the query, which the
-# app's own presets hit.
+# misattribute results. 1.7.6 is also the first version whose bundled
+# datasets were re-serialised with the current Seqinfo class tag. Before it,
+# reference_data, query_data and qc_data name GenomeInfoDb as Seqinfo's home
+# package, from before Seqinfo was split out, and a newer Bioconductor has to
+# migrate them as they load. The presets load exactly those objects, so a
+# migration that fails surfaces as a preset that will not open.
 SCDIAG_MIN_VERSION <- "1.7.6"
 
 #' Check the installed package version, returning a message or NULL
