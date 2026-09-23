@@ -84,34 +84,51 @@ jobs:
           after <- jsonlite::fromJSON(path, simplifyVector = FALSE)
           writeLines(committed, path)
 
-          # Recorded package versions and the "platform" field describe the
-          # library that generated the manifest, so they differ here by
-          # design and comparing the file byte for byte would always fail.
-          # Staleness that actually breaks a deploy is a dependency or a
-          # source file the manifest does not list.
-          report <- function(what, old, new) {
-            stale <- setdiff(old, new)
-            fresh <- setdiff(new, old)
-            if (length(stale)) {
-              cat("manifest.json lists", what, "the app no longer uses:\n  ",
-                  paste(stale, collapse = ", "), "\n")
-            }
-            if (length(fresh)) {
-              cat("manifest.json is missing", paste0(what, ":"), "\n  ",
-                  paste(fresh, collapse = ", "), "\n")
-            }
-            length(stale) + length(fresh)
+          # Recorded versions and the "platform" field describe the library
+          # that generated the manifest, so they differ here by design and a
+          # byte-for-byte comparison would always fail.
+          #
+          # The package sets differ legitimately too, because this container
+          # resolves a different dependency closure than the deployment does.
+          # plogr is the standing example: RSQLite links to it under the R the
+          # deployment runs, but not under the R here. So the two directions
+          # are not equally interesting. A package the manifest carries and
+          # this container does not need costs an install and nothing else. A
+          # package the manifest lacks is a package the deploy will not
+          # install, which is how SpatialExperiment went missing. Only the
+          # second fails. File paths do not vary between environments, so both
+          # directions fail there.
+          bad <- 0L
+          note <- function(msg, x) {
+            cat(msg, "\n  ", paste(x, collapse = ", "), "\n")
           }
-          drift <- report("packages", names(before$packages), names(after$packages)) +
-            report("files", names(before$files), names(after$files))
-          if (drift) {
+          extra_pkgs <- setdiff(names(before$packages), names(after$packages))
+          if (length(extra_pkgs)) {
+            note("note: manifest.json carries packages this container does not resolve.\nExpected where the deployment's R differs; they only cost an install:",
+                 extra_pkgs)
+          }
+          missing_pkgs <- setdiff(names(after$packages), names(before$packages))
+          if (length(missing_pkgs)) {
+            note("manifest.json is missing packages the app needs:", missing_pkgs)
+            bad <- bad + length(missing_pkgs)
+          }
+          gone_files <- setdiff(names(before$files), names(after$files))
+          if (length(gone_files)) {
+            note("manifest.json lists files that no longer exist:", gone_files)
+            bad <- bad + length(gone_files)
+          }
+          new_files <- setdiff(names(after$files), names(before$files))
+          if (length(new_files)) {
+            note("manifest.json is missing files:", new_files)
+            bad <- bad + length(new_files)
+          }
+          if (bad) {
             cat("\nRegenerate it from the repository root and commit:\n")
-            cat("  options(repos = BiocManager::repositories())\n")
-            cat("  rsconnect::writeManifest(appDir = \"app\", appPrimaryDoc = \"app.R\")\n")
+            cat("  Rscript manifest.R\n")
             quit(status = 1)
           }
-          cat("manifest.json covers", length(after$packages), "packages and",
-              length(after$files), "files; both match the code.\n")
+          cat("manifest.json covers every package and file the app needs (",
+              length(before$packages), "packages,", length(before$files), "files ).\n")
         shell: Rscript {0}
 
       # Everything except the browser suite, which needs Chrome.
