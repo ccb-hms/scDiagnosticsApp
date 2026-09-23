@@ -160,6 +160,13 @@ descriptor_id <- function(d) {
 #' Safe to call inside a future worker; memoised per process.
 materialize <- function(d) {
     stopifnot(inherits(d, "sc_descriptor"))
+    # The MERFISH preset, and any SpatialExperiment someone uploads, carry an
+    # S4 class defined in SpatialExperiment. R loads that namespace itself
+    # while deserialising, but only if the package is installed. Nothing in
+    # the app calls it directly, so renv's scan cannot see the dependency and
+    # it was missing from manifest.json: the preset loaded here and failed
+    # anywhere the package had not been installed for another reason.
+    requireNamespace("SpatialExperiment", quietly = TRUE)
     if (d$kind == "preset") return(load_pkg_data(d$key))
     key <- paste0("file:", d$key)
     if (!is.null(.preset_cache[[key]])) return(.preset_cache[[key]])

@@ -45,6 +45,8 @@ jobs:
           pkgs <- c("shiny", "bslib", "bsicons", "DT", "cachem", "digest",
                     "future", "promises", "ggplot2", "GGally", "ggridges",
                     "scran", "scater", "ComplexHeatmap", "zellkonverter",
+                    # The MERFISH preset is a SpatialExperiment.
+                    "SpatialExperiment",
                     "shinytest2", "lintr", "rsconnect")
           missing <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly = TRUE)]
           if (length(missing)) BiocManager::install(missing, ask = FALSE, update = FALSE)
