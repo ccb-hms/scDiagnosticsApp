@@ -31,6 +31,11 @@ jobs:
           restore-keys: ${{ runner.os }}-bioc-devel-
 
       - name: Install dependencies
+        env:
+          # remotes reads the ref metadata from the GitHub API before it
+          # downloads. Unauthenticated, that is 60 requests an hour shared
+          # across the runner's IP, which is normally already spent.
+          GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
         run: |
           options(repos = BiocManager::repositories(), Ncpus = 2)
           # BiocManager delegates GitHub installs to remotes, which the
@@ -96,6 +101,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Regenerate and compare
+        env:
+          GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
         run: |
           options(repos = BiocManager::repositories())
           # remotes is what BiocManager uses to install from GitHub.
