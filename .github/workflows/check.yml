@@ -45,7 +45,7 @@ jobs:
           pkgs <- c("shiny", "bslib", "bsicons", "DT", "cachem", "digest",
                     "future", "promises", "ggplot2", "GGally", "ggridges",
                     "scran", "scater", "ComplexHeatmap", "zellkonverter",
-                    "shinytest2", "lintr")
+                    "shinytest2", "lintr", "rsconnect")
           missing <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly = TRUE)]
           if (length(missing)) BiocManager::install(missing, ask = FALSE, update = FALSE)
         shell: Rscript {0}
@@ -66,6 +66,50 @@ jobs:
           lints <- lintr::lint_dir("R")
           print(lints)
           if (length(lints)) quit(status = 1)
+        shell: Rscript {0}
+
+      # The manifest must reflect the code, or a deploy installs the wrong
+      # dependency set. This runs here rather than in a job of its own
+      # because writeManifest has to snapshot the whole library, which the
+      # step above has already built.
+      - name: Check the manifest against the code
+        run: |
+          path <- "app/manifest.json"
+          committed <- readLines(path)
+          before <- jsonlite::fromJSON(path, simplifyVector = FALSE)
+          options(renv.config.snapshot.validate = FALSE)
+          rsconnect::writeManifest(appDir = "app", appPrimaryDoc = "app.R")
+          after <- jsonlite::fromJSON(path, simplifyVector = FALSE)
+          writeLines(committed, path)
+
+          # Recorded package versions and the "platform" field describe the
+          # library that generated the manifest, so they differ here by
+          # design and comparing the file byte for byte would always fail.
+          # Staleness that actually breaks a deploy is a dependency or a
+          # source file the manifest does not list.
+          report <- function(what, old, new) {
+            stale <- setdiff(old, new)
+            fresh <- setdiff(new, old)
+            if (length(stale)) {
+              cat("manifest.json lists", what, "the app no longer uses:\n  ",
+                  paste(stale, collapse = ", "), "\n")
+            }
+            if (length(fresh)) {
+              cat("manifest.json is missing", paste0(what, ":"), "\n  ",
+                  paste(fresh, collapse = ", "), "\n")
+            }
+            length(stale) + length(fresh)
+          }
+          drift <- report("packages", names(before$packages), names(after$packages)) +
+            report("files", names(before$files), names(after$files))
+          if (drift) {
+            cat("\nRegenerate it from the repository root and commit:\n")
+            cat("  options(repos = BiocManager::repositories())\n")
+            cat("  rsconnect::writeManifest(appDir = \"app\", appPrimaryDoc = \"app.R\")\n")
+            quit(status = 1)
+          }
+          cat("manifest.json covers", length(after$packages), "packages and",
+              length(after$files), "files; both match the code.\n")
         shell: Rscript {0}
 
       # Everything except the browser suite, which needs Chrome.
@@ -91,32 +135,3 @@ jobs:
             app/tests/_snaps
             app/shots_tmp
           if-no-files-found: ignore
-
-  manifest:
-    # The manifest must reflect the code, or a deploy installs the wrong
-    # dependency set. Regenerating it and diffing catches a stale commit.
-    runs-on: ubuntu-latest
-    container:
-      image: bioconductor/bioconductor_docker:devel
-    steps:
-      - uses: actions/checkout@v4
-      - name: Regenerate and compare
-        env:
-          GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          options(repos = BiocManager::repositories())
-          # remotes is what BiocManager uses to install from GitHub.
-          deps <- c("rsconnect", "remotes")
-          missing <- deps[!vapply(deps, requireNamespace, logical(1), quietly = TRUE)]
-          if (length(missing)) install.packages(missing)
-          BiocManager::install("ccb-hms/scDiagnostics", ask = FALSE, update = FALSE)
-          before <- if (file.exists("app/manifest.json")) readLines("app/manifest.json") else character()
-          options(renv.config.snapshot.validate = FALSE)
-          rsconnect::writeManifest(appDir = "app", appPrimaryDoc = "app.R")
-          after <- readLines("app/manifest.json")
-          if (!identical(before, after)) {
-            cat("manifest.json is out of date; regenerate and commit it.\n")
-            quit(status = 1)
-          }
-          cat("manifest.json is current.\n")
-        shell: Rscript {0}
