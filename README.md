@@ -5,8 +5,19 @@ Interactive companion to the
 It checks whether the cell type labels in your data hold up when compared
 against a reference you trust.
 
-**Use it here:** <https://ccb.connect.hms.harvard.edu/scDiagnosticsApp/> —
-nothing to install.
+There are two ways to use it.
+
+**Run it on your own machine.** One command, and your data never leaves it:
+
+```bash
+Rscript run.R
+```
+
+See [Running your own copy](#running-your-own-copy) below for what you need
+first.
+
+**Or use the instance hosted at HMS**, if you would rather not install
+anything: <https://ccb.connect.hms.harvard.edu/scDiagnosticsApp/>
 
 ## What it does
 
@@ -43,8 +54,14 @@ doi:[10.1093/bib/bbag496](https://doi.org/10.1093/bib/bbag496)
 
 ## Running your own copy
 
-Most people should just use the live app. To run it locally you need R 4.4 or
-newer and `scDiagnostics` 1.7.6 or newer. From the repository root:
+You need R 4.4 or newer, and `scDiagnostics` 1.7.6 or newer. Bioconductor
+release ships an older version, so install the package from GitHub:
+
+```r
+BiocManager::install("ccb-hms/scDiagnostics")
+```
+
+Then, from the repository root:
 
 ```bash
 Rscript run.R

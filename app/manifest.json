@@ -4390,7 +4390,7 @@
         "Type": "Package",
         "Package": "scDiagnostics",
         "Title": "Cell type annotation diagnostics",
-        "Version": "1.7.10",
+        "Version": "1.7.15",
         "Authors@R": "c(\n    person(\"Anthony\", \"Christidis\", role = c(\"aut\", \"cre\"), \n            email = \"anthony-alexander_christidis@hms.harvard.edu\", \n            comment = c(ORCID = \"0000-0002-4565-6279\")),\n    person(\"Andrew\", \"Ghazi\", role = \"aut\"),\n    person(\"Smriti\", \"Chawla\", role = \"aut\"),\n    person(\"Nitesh\", \"Turaga\", role = \"ctb\"),\n    person(\"Ludwig\", \"Geistlinger\", role = \"aut\"),\n    person(\"Robert\", \"Gentleman\", role = \"aut\")\n  )",
         "Description": "The scDiagnostics package provides diagnostic plots to\n    assess the quality of cell type assignments from single cell gene\n    expression profiles. The implemented functionality allows to\n    assess the reliability of cell type annotations, investigate gene\n    expression patterns, and explore relationships between different\n    cell types in query and reference datasets allowing users to\n    detect potential misalignments between reference and query\n    datasets. The package also provides visualization capabilities for\n    diagnostics purposes.    ",
         "License": "Artistic-2.0",
@@ -4411,16 +4411,16 @@
         "RemoteRepo": "scDiagnostics",
         "RemoteUsername": "ccb-hms",
         "RemoteRef": "HEAD",
-        "RemoteSha": "58cf3022aee073ef86bf0e5695fe41dd4a701ec9",
+        "RemoteSha": "bee3ff588074c8e26c3b15b12610f23b7c19acdc",
         "GithubRepo": "scDiagnostics",
         "GithubUsername": "ccb-hms",
         "GithubRef": "HEAD",
-        "GithubSHA1": "58cf3022aee073ef86bf0e5695fe41dd4a701ec9",
+        "GithubSHA1": "bee3ff588074c8e26c3b15b12610f23b7c19acdc",
         "NeedsCompilation": "no",
-        "Packaged": "2026-09-21 17:28:37 UTC; anthony",
+        "Packaged": "2026-10-02 01:33:57 UTC; anthony",
         "Author": "Anthony Christidis [aut, cre] (ORCID:\n    <https://orcid.org/0000-0002-4565-6279>),\n  Andrew Ghazi [aut],\n  Smriti Chawla [aut],\n  Nitesh Turaga [ctb],\n  Ludwig Geistlinger [aut],\n  Robert Gentleman [aut]",
         "Maintainer": "Anthony Christidis <anthony-alexander_christidis@hms.harvard.edu>",
-        "Built": "R 4.5.2; ; 2026-09-21 17:28:39 UTC; windows"
+        "Built": "R 4.5.2; ; 2026-10-02 01:33:58 UTC; windows"
       }
     },
     "scales": {
@@ -5194,7 +5194,7 @@
       "checksum": "fabdd0265c5c835d676e419d2a241153"
     },
     "app.R": {
-      "checksum": "adb33609e00e729ce0d82294aa34ca21"
+      "checksum": "30c8101f758d16d0ee5f0b7cdbbab609"
     },
     "inst/precomputed/k09e7b0be5fe139f8.rds": {
       "checksum": "d69400533065be383a5e120246a7e260"
