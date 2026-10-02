@@ -219,23 +219,38 @@ to_open <- c("plotCellTypePCA", "detectAnomaly", "calculateGeneShifts",
              "calculateGraphIntegration", "projectPCA")
 
 has_content <- function(id) {
-    app$get_js(sprintf(
+    as.numeric(app$get_js(sprintf(
         "(document.getElementById(%s)||{innerHTML:''}).innerHTML.length",
-        shQuote(id, type = "cmd")))
+        shQuote(id, type = "cmd"))))
+}
+
+# A panel's outputs are suspended while it is hidden: the diagnostic module
+# does not call always_render(), since forcing all 33 panels to render
+# regardless of visibility would cost real work at startup. Showing a panel
+# therefore renders it only after the browser reports the visibility change,
+# and wait_for_idle() can return inside that window, with the panel still
+# empty. Wait for the content rather than assuming idle means rendered.
+wait_for_content <- function(id, timeout = 60) {
+    deadline <- Sys.time() + timeout
+    repeat {
+        n <- has_content(id)
+        if (n > 0 || Sys.time() > deadline) return(n)
+        Sys.sleep(0.25)
+    }
 }
 
 for (id in to_open) {
     app$click(paste0("catalogue-pick_", id))
     app$wait_for_idle(timeout = 300 * 1000)
+    ctrl <- wait_for_content(sprintf("catalogue-d_%s-controls", id))
     html <- app$get_html("body")
     errs <- shiny_errors(app)
     check(sprintf("panel %s renders without error", id), length(errs) == 0,
           paste(errs, collapse = ", "))
     check(sprintf("panel %s shows its function name", id),
           grepl(paste0(id, "()"), html, fixed = TRUE))
-    ctrl <- has_content(sprintf("catalogue-d_%s-controls", id))
-    check(sprintf("panel %s renders its controls", id), as.numeric(ctrl) > 0,
-          sprintf("innerHTML length %s", ctrl))
+    check(sprintf("panel %s renders its controls", id), ctrl > 0,
+          sprintf("innerHTML length %s after waiting", ctrl))
 }
 
 # --- results actually arrive -------------------------------------------------
